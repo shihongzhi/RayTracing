@@ -1,0 +1,4 @@
+这是我的一个光线跟踪程序的源码
+现在只实现了一些基本功能，折射，反射，gird accelerate(3DDDA)
+plan:  kd-tree;solid texture;soft shadow;photo mapping;CUDA
+
