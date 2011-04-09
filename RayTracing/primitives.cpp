@@ -6,6 +6,39 @@
 #include "raytracing_stats.h"
 #include "utility.h"
 
+void Object3D::interObjToGrid(Grid* grid)
+{
+	Vec3f tempMin;
+	Vec3f tempMax;
+	int iMin,iMax,jMin,jMax,kMin,kMax;
+
+	tempMin = min;
+	tempMax = max;
+	//计算出来的i,j,k 肯定是属于0-nx,0-ny,0-nz;
+	iMin = (int)((tempMin.x()-grid->getMin().x())/grid->GetDx());
+	jMin = (int)((tempMin.y()-grid->getMin().y())/grid->GetDy());
+	kMin = (int)((tempMin.z()-grid->getMin().z())/grid->GetDz());
+	iMax = (int)((tempMax.x()-grid->getMin().x())/grid->GetDx());
+	jMax = (int)((tempMax.y()-grid->getMin().y())/grid->GetDy());
+	kMax = (int)((tempMax.z()-grid->getMin().z())/grid->GetDz());
+
+	//其实这里可以不要的
+	if(iMax==grid->GetNx()) iMax--;
+	if(jMax==grid->GetNy()) jMax--;
+	if(kMax==grid->GetNz()) kMax--;
+	//printf("%d %d %d %d %d %d  %d\n",iMin,jMin,kMin,iMax,jMax,kMax,count);
+	for(int i=iMin; i<=iMax; ++i)
+	{
+		for(int j=jMin; j<=jMax; ++j)
+		{
+			for(int k=kMin; k<=kMax; ++k)
+			{
+				grid->GetObject3d(i,j,k).addObject(this);
+			}
+		}
+	}
+}
+
 bool Sphere::intersect(const Ray &r, Hit &h, float tmin)
 {
 	Vec3f v = center - r.getOrigin();
@@ -58,6 +91,11 @@ bool Plane::intersect(const Ray &r, Hit &h, float tmin)
 	return 0;
 }
 
+void Plane::interObjToGrid(Grid* grid)
+{
+	grid->GetOthers().addObject(this);
+}
+
 Triangle::Triangle(Vec3f &_a, Vec3f &_b, Vec3f &_c, Material *m)
 {
 	a = _a; 
@@ -77,35 +115,10 @@ Triangle::Triangle(Vec3f &_a, Vec3f &_b, Vec3f &_c, Material *m)
 		i0 = 2;
 }
 
-//rayCast2 P48
+//用了彭老师书上介绍的求交方法，但是transform之后就有问题
 bool Triangle::intersect(const Ray &r, Hit &h, float tmin)
 {
-
-	//float A = Matrix::det3x3(a.x()-b.x(),a.x()-c.x(),r.getDirection().x(),
-	//						 a.y()-b.y(),a.y()-c.y(),r.getDirection().y(),
-	//						 a.z()-b.z(),a.z()-c.z(),r.getDirection().z());
-	//float betaUp = Matrix::det3x3(a.x()-r.getOrigin().x(),a.x()-c.x(),r.getDirection().x(),
-	//							  a.y()-r.getOrigin().y(),a.y()-c.y(),r.getDirection().y(),
-	//							  a.z()-r.getOrigin().z(),a.z()-c.z(),r.getDirection().z());
-	//float alphaUp = Matrix::det3x3(a.x()-b.x(),a.x()-r.getOrigin().x(),r.getDirection().x(),
-	//							   a.y()-b.y(),a.y()-r.getOrigin().y(),r.getDirection().y(),
-	//							   a.z()-b.z(),a.z()-r.getOrigin().z(),r.getDirection().z());
-	//float tUp = Matrix::det3x3(a.x()-b.x(),a.x()-c.x(),a.x()-r.getOrigin().x(),
-	//						   a.y()-b.y(),b.y()-c.y(),a.y()-r.getOrigin().y(),
-	//						   a.z()-b.z(),b.z()-c.z(),a.z()-r.getOrigin().z());
-	//float beta = betaUp / A;
-	//float alpha = alphaUp / A;
-	//float t = tUp / A;
-	//if((beta+alpha)<=1 && (beta>=0) && (alpha>=0) && (t>tmin) && (t<h.getT()))
-	//{
-	//	Vec3f normal;
-	//	Vec3f::Cross3(normal,b-a,c-a);
-	//	normal.Normalize();
-	//	h.set(t,material,normal,r);
-	//	return 1;
-	//}
-	//return 0;
-	/*Matrix A;
+	Matrix A;
 	A.SetToIdentity();
 	A.Set(0,0,a.x()-b.x());
 	A.Set(1,0,a.x()-c.x());
@@ -131,8 +144,9 @@ bool Triangle::intersect(const Ray &r, Hit &h, float tmin)
 			return 1;
 		}
 	}
-	return 0;*/
-	Vec3f origin = r.getOrigin();
+	return 0;
+	//为什么当使用transform之后，这里的求交函数就不能用了？
+	/*Vec3f origin = r.getOrigin();
 	Vec3f direct = r.getDirection();
 	float isParallel = normal.Dot3(direct);
 	Vec3f tempbeta0;
@@ -141,7 +155,7 @@ bool Triangle::intersect(const Ray &r, Hit &h, float tmin)
 	float beta0;
 	float beta1;
 	float beta2;
-	if(!Utility::isZero(isParallel))
+	if(fabs(isParallel)>0.0f)
 	{
 		float dist = -(normal.Dot3(origin)+d)/isParallel;
 		Vec3f q = origin + direct*dist;
@@ -175,23 +189,54 @@ bool Triangle::intersect(const Ray &r, Hit &h, float tmin)
 			}
 		}
 	}
-	return false;
+	return false;*/
 
 }
+
 Transform::Transform(Matrix &_m, Object3D *o)
 {
 	m = _m;
 	instance = o;
 
-	//这类直接判断为Triangle了
-	Vec3f aTrans = ((Triangle*)instance)->getA();
-	Vec3f bTrans = ((Triangle*)instance)->getB();
-	Vec3f cTrans = ((Triangle*)instance)->getC();
-	m.Transform(aTrans);
-	m.Transform(bTrans);
-	m.Transform(cTrans);
-	Vec3f::GetThreeMax(max,aTrans,bTrans,cTrans);
-	Vec3f::GetThreeMin(min,aTrans,bTrans,cTrans);
+	//还可以对三角形进行优化
+	Vec3f *temp;
+	temp = (Vec3f*)malloc(sizeof(Vec3f)*8);
+	temp[0] = instance->getMin();
+	temp[7] = instance->getMax();
+	temp[1].Set(temp[0].x(),temp[0].y(),temp[7].z());
+	temp[2].Set(temp[0].x(),temp[7].y(),temp[0].z());
+	temp[3].Set(temp[0].x(),temp[7].y(),temp[7].z());
+	temp[4].Set(temp[7].x(),temp[0].y(),temp[0].z());
+	temp[5].Set(temp[7].x(),temp[0].y(),temp[7].z());
+	temp[6].Set(temp[7].x(),temp[7].y(),temp[0].z());
+	for(int i=0; i<8; ++i)
+	{
+		m.Transform(temp[i]);	
+	}
+	float xMax,xMin,yMax,yMin,zMax,zMin;
+	xMax = temp[0].x();
+	xMin = temp[0].x();
+	yMax = temp[0].y();
+	yMin = temp[0].y();
+	zMax = temp[0].z();
+	zMin = temp[0].z();
+	for(int i=1; i<8; ++i)
+	{
+		if(temp[i].x() > xMax)
+			xMax = temp[i].x();
+		if(temp[i].x() < xMin)
+			xMin = temp[i].x();
+		if(temp[i].y() > yMax)
+			yMax = temp[i].y();
+		if(temp[i].y() < yMin)
+			yMin = temp[i].y();
+		if(temp[i].z() > zMax)
+			zMax = temp[i].z();
+		if(temp[i].z() < zMin)
+			zMin = temp[i].z();
+	}
+	min.Set(xMin,yMin,zMin);
+	max.Set(xMax,yMax,zMax);
 }
 
 bool Transform::intersect(const Ray &r, Hit &h, float tmin)
@@ -208,7 +253,6 @@ bool Transform::intersect(const Ray &r, Hit &h, float tmin)
 	Hit hTrans(10000,NULL,Vec3f(0,0,0));  //need a new hit,because the x-y-z had changed  就因为这里没有使用一个新的hit导致了自己debug了两天
 	if(instance->intersect(rTrans,hTrans,tmin) == 1)
 	{
-
 		//world's normal
 		Matrix mInTr;
 		mInverse.Transpose(mInTr);
@@ -263,8 +307,6 @@ bool Group::intersect(const Ray &r, Hit &h, float tmin)
 		return 0;
 }
 
-
-//这里有问题
 void Group::addObject(int index, Object3D *obj)
 {
 	if(number > index)
@@ -290,7 +332,7 @@ void Group::calutateMinMax()
 			max_x = instances[i]->getMax().x();
 		if(max_y < instances[i]->getMax().y())
 			max_y = instances[i]->getMax().y();
-		if(max_z < instances[i]->getMax().y())
+		if(max_z < instances[i]->getMax().z())
 			max_z = instances[i]->getMax().z();
 		if(min_x > instances[i]->getMin().x())
 			min_x = instances[i]->getMin().x();
@@ -305,39 +347,9 @@ void Group::calutateMinMax()
 
 void Group::interObjToGrid(Grid *grid)
 {
-	Vec3f tempMin;
-	Vec3f tempMax;
-	int iMin,iMax,jMin,jMax,kMin,kMax;
-	Group* tempGroup = (Group*)instances[0];
-	int tempNumber = tempGroup->getNumber();
-
-	for(int count=0; count<tempNumber; ++count)
+	for(int i=0; i<number; i++)
 	{
-		tempMin = tempGroup->getObject(count)->getMin();
-		tempMax = tempGroup->getObject(count)->getMax();
-		//计算出来的i,j,k 肯定是属于0-nx,0-ny,0-nz;
-		iMin = (int)((tempMin.x()-grid->getMin().x())/grid->GetDx());
-		jMin = (int)((tempMin.y()-grid->getMin().y())/grid->GetDy());
-		kMin = (int)((tempMin.z()-grid->getMin().z())/grid->GetDz());
-		iMax = (int)((tempMax.x()-grid->getMin().x())/grid->GetDx());
-		jMax = (int)((tempMax.y()-grid->getMin().y())/grid->GetDy());
-		kMax = (int)((tempMax.z()-grid->getMin().z())/grid->GetDz());
-		
-		//其实这里可以不要的
-		if(iMax==grid->GetNx()) iMax--;
-		if(jMax==grid->GetNy()) jMax--;
-		if(kMax==grid->GetNz()) kMax--;
-		//printf("%d %d %d %d %d %d  %d\n",iMin,jMin,kMin,iMax,jMax,kMax,count);
-		for(int i=iMin; i<=iMax; ++i)
-		{
-			for(int j=jMin; j<=jMax; ++j)
-			{
-				for(int k=kMin; k<=kMax; ++k)
-				{
-					grid->GetObject3d(i,j,k).addObject(tempGroup->getObject(count));
-				}
-			}
-		}
+		instances[i]->interObjToGrid(grid);
 	}
 }
 
@@ -387,28 +399,6 @@ Grid::~Grid()
 	delete [] isOpaque;
 }
 
-//void Grid::rasterizeSphere(Vec3f center, float radius)
-//{
-//	float sizeX = (max.x()-min.x()) / nx;
-//	float sizeY = (max.y()-min.y()) / ny;
-//	float sizeZ = (max.z()-min.z()) / nz;
-//	for(int i=0; i<nx; i++)
-//	{
-//		for(int j=0; j<ny; j++)
-//		{
-//			for(int k=0; k<nz; k++)
-//			{
-//				Vec3f temp(min.x()+sizeX*i+sizeX/2,min.y()+sizeY*j+sizeY/2,min.z()+sizeZ*k+sizeZ/2);
-//				Vec3f disVec = center - temp;
-//				float len = disVec.Length();
-//				if(len<=radius)
-//					isOpaque[i][j][k] = true;
-//				else
-//					isOpaque[i][j][k] = false;
-//			}
-//		}
-//	}
-//}
 
 void Grid::initialRayMarch(MarchingInfo &mi, const Ray &r, float tmin) const
 {
@@ -595,6 +585,7 @@ bool Grid::intersect(const Ray &r, Hit &h, float tmin)
 		//printf("%d %d %d\n",currentI,currentJ,currentK);
 		for(int i=0; i<numObjects; ++i)
 		{
+			//already intersected object don't need intersect again
 			if(isAlreadyIntersect.isInside(currentVector->getObject(i)))
 				continue;
 			RayTracingStats::IncrementNumIntersections();
@@ -612,6 +603,14 @@ bool Grid::intersect(const Ray &r, Hit &h, float tmin)
 		currentK = march.GetK();
 		currentT = march.GetT();  //折射或反射，shadow时，光线圆点会在grid内
 	}
+	numObjects = others.getNumObjects();
+	for(int i=0; i<numObjects; i++)
+	{
+		others.getObject(i)->intersect(r,h,tmin);
+	}
+	if(h.getMaterial()!=NULL)   //这里有问题，因为如果没有和平面相交的话，h的material也有可能不是null
+		return true;
+
 	return false;
 }
 
@@ -647,6 +646,12 @@ bool Grid::shadowIntersect(const Ray &r, Hit &h, float tmin)
 		currentJ = march.GetJ();
 		currentK = march.GetK();
 		currentT = march.GetT();  //折射或反射，shadow时，光线圆点会在grid内
+	}
+	numObjects = others.getNumObjects();
+	for(int i=0; i<numObjects; i++)
+	{
+		if(others.getObject(i)->intersect(r,h,tmin))
+			return true;
 	}
 	return false;
 }

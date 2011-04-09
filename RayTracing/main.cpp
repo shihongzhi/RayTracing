@@ -15,8 +15,8 @@
 int main(int argc,char **argv)
 {
 	char *input_file = "assignment4/scene8_bunny_mesh_40k.txt";
-	int width = 1000;
-	int height = 1000;
+	int width = 300;
+	int height = 300;
 	char *output_file = "test.tga";
 	float depth_min = 0;
 	float depth_max = 1;
@@ -27,12 +27,12 @@ int main(int argc,char **argv)
 
 	SceneParser parser(input_file);
 	Camera* camera = parser.getCamera();
-	RayTracer tracer(&parser,1);
+	RayTracer tracer(&parser,3);
 	Image image(width,height);
 	Ray r;
-	//Material *material = new PhongMaterial();  //没有初始化，注意
-	Grid* grid = new Grid(parser.getGroup()->getObject(0)->getMin(),parser.getGroup()->getObject(0)->getMax(),nx,ny,nz);
-	RayTracingStats::Initialize(width,height,nx,ny,nz,parser.getGroup()->getObject(0)->getMin(),parser.getGroup()->getObject(0)->getMax());
+
+	Grid* grid = new Grid(parser.getGroup()->getMin(),parser.getGroup()->getMax(),nx,ny,nz);
+	RayTracingStats::Initialize(width,height,nx,ny,nz,parser.getGroup()->getMin(),parser.getGroup()->getMax());
 	parser.getGroup()->interObjToGrid(grid);
 
 	for(int i=0; i<height; i++)

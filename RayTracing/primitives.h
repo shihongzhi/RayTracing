@@ -11,13 +11,14 @@ class Hit;
 class Ray;
 class Material;
 class MarchingInfo;
-
+class Grid;
 
 class Object3D{
 public:
 	Object3D():material(NULL){}
 	~Object3D(){}
 	virtual bool intersect(const Ray &r,Hit &h,float tmin) = 0;
+	virtual void interObjToGrid(Grid* grid);  //sphere,triangle,transform的interObjToGrid方法都是一样的，因此为了减少重复代码，在这里实现。
 	Material* getMaterial(){ return material;}
 	void setMaterial(Material* m){ material = m;}
 	Vec3f getMax(){ return max;}
@@ -44,6 +45,7 @@ public:
 	Plane(Vec3f &_normal,float _d, Material *m){_normal.Normalize(); normal = _normal; d = _d; material = m;}
 	~Plane(){}
 	virtual bool intersect(const Ray &r,Hit &h,float tmin);
+	void interObjToGrid(Grid* grid);
 private:
 	Vec3f normal;
 	float d;
@@ -84,7 +86,6 @@ public:
 	void initialRayMarch(MarchingInfo &mi, const Ray &r, float tmin) const;
 	virtual bool intersect(const Ray &r,Hit &h,float tmin);
 	bool shadowIntersect(const Ray &r,Hit &h,float tmin);
-	//bool*** GetisOpaque(){ return isOpaque;}
 	int GetNx(){ return nx;}
 	int GetNy(){ return ny;}
 	int GetNz(){ return nz;}
@@ -92,11 +93,13 @@ public:
 	float GetDy(){ return dy;}
 	float GetDz(){ return dz;}
 	Object3DVector& GetObject3d(int i,int j,int k){ return isOpaque[i][j][k];}
+	Object3DVector& GetOthers(){return others;};
 	void SetObject3d(Object3DVector o,int i,int j,int k){ isOpaque[i][j][k] = o;}
 private:
 	int nx,ny,nz;
 	float dx,dy,dz;
 	Object3DVector ***isOpaque;
+	Object3DVector others;
 };
 
 class Group : public Object3D{
