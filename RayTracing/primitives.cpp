@@ -145,52 +145,51 @@ bool Triangle::intersect(const Ray &r, Hit &h, float tmin)
 		}
 	}
 	return 0;
-	//为什么当使用transform之后，这里的求交函数就不能用了？
-	/*Vec3f origin = r.getOrigin();
-	Vec3f direct = r.getDirection();
-	float isParallel = normal.Dot3(direct);
-	Vec3f tempbeta0;
-	Vec3f tempbeta1;
-	Vec3f tempbeta2;
-	float beta0;
-	float beta1;
-	float beta2;
-	if(fabs(isParallel)>0.0f)
-	{
-		float dist = -(normal.Dot3(origin)+d)/isParallel;
-		Vec3f q = origin + direct*dist;
-		Vec3f::Cross3(tempbeta0,(c-b),(q-b));
-		Vec3f::Cross3(tempbeta1,(a-c),(q-c));
-		Vec3f::Cross3(tempbeta2,(b-a),(q-a));
-		if(i0 == 0)
-		{
-			beta0 = tempbeta0.x()/normal.x();	
-			beta1 = tempbeta1.x()/normal.x();
-			beta2 = tempbeta2.x()/normal.x();
-		}
-		else if(i0 == 1)
-		{
-			beta0 = tempbeta0.y()/normal.y();
-			beta1 = tempbeta1.y()/normal.y();
-			beta2 = tempbeta2.y()/normal.y();
-		}
-		else
-		{
-			beta0 = tempbeta0.z()/normal.z();
-			beta1 = tempbeta1.z()/normal.z();
-			beta2 = tempbeta2.z()/normal.z();
-		}
-		if(beta0>=0 && beta0<=1 && beta1>=0 && beta1<=1 && beta2>=0 && beta2<=1)
-		{
-			if(dist > tmin && dist < h.getT())
-			{
-				h.set(dist,material,normal,r);
-				return true;	
-			}
-		}
-	}
-	return false;*/
-
+	//为什么当使用transform之后，这里的求交函数就不能用了？  用没有加速的程序检测了一下，也无法求交，应该是这里的求交写错掉了
+	//Vec3f origin = r.getOrigin();
+	//Vec3f direct = r.getDirection();
+	//float isParallel = normal.Dot3(direct);
+	//Vec3f tempbeta0;
+	//Vec3f tempbeta1;
+	//Vec3f tempbeta2;
+	//float beta0;
+	//float beta1;
+	//float beta2;
+	//if(fabs(isParallel)>0.0f)
+	//{
+	//	float dist = -(normal.Dot3(origin)+d)/isParallel;
+	//	Vec3f q = origin + direct*dist;
+	//	Vec3f::Cross3(tempbeta0,(c-b),(q-b));
+	//	Vec3f::Cross3(tempbeta1,(a-c),(q-c));
+	//	Vec3f::Cross3(tempbeta2,(b-a),(q-a));
+	//	if(i0 == 0)
+	//	{
+	//		beta0 = tempbeta0.x()/normal.x();	
+	//		beta1 = tempbeta1.x()/normal.x();
+	//		beta2 = tempbeta2.x()/normal.x();
+	//	}
+	//	else if(i0 == 1)
+	//	{
+	//		beta0 = tempbeta0.y()/normal.y();
+	//		beta1 = tempbeta1.y()/normal.y();
+	//		beta2 = tempbeta2.y()/normal.y();
+	//	}
+	//	else
+	//	{
+	//		beta0 = tempbeta0.z()/normal.z();
+	//		beta1 = tempbeta1.z()/normal.z();
+	//		beta2 = tempbeta2.z()/normal.z();
+	//	}
+	//	if(beta0>=0 && beta0<=1 && beta1>=0 && beta1<=1 && beta2>=0 && beta2<=1)
+	//	{
+	//		if(dist > tmin && dist < h.getT())
+	//		{
+	//			h.set(dist,material,normal,r);
+	//			return true;	
+	//		}
+	//	}
+	//}
+	//return false;
 }
 
 Transform::Transform(Matrix &_m, Object3D *o)
@@ -251,32 +250,34 @@ bool Transform::intersect(const Ray &r, Hit &h, float tmin)
 	rTransDir.Normalize();
 	Ray rTrans(rTransDir,rTransOri);
 	Hit hTrans(10000,NULL,Vec3f(0,0,0));  //need a new hit,because the x-y-z had changed  就因为这里没有使用一个新的hit导致了自己debug了两天
-	if(instance->intersect(rTrans,hTrans,tmin) == 1)
+	instance->intersect(rTrans,hTrans,tmin);
+	if(hTrans.getT()<10000)
 	{
-		//world's normal
-		Matrix mInTr;
-		mInverse.Transpose(mInTr);
-		Vec3f wNormal = hTrans.getNormal();
-		mInTr.TransformDirection(wNormal);
-		wNormal.Normalize();  //need normalize
-		//h.setNormal(wNormal);
-
 		//world's t
 		float t;
-		Vec3f hitPoint = rTransOri + rTransDir * hTrans.getT();
+		//Vec3f hitPoint = rTransOri + rTransDir * hTrans.getT();
+		Vec3f hitPoint = rTrans.pointAtParameter(hTrans.getT());
 		m.Transform(hitPoint);
 		Vec3f rOri = r.getOrigin();
 		Vec3f rDir = r.getDirection();
-		if((rDir[0]>=rDir[1])&&(rDir[0]>=rDir[2])){
+		if((fabs(rDir[0])>=fabs(rDir[1]))&&(fabs(rDir[0])>=fabs(rDir[2]))){
 			t = (hitPoint[0] - rOri[0]) / rDir[0]; 	
 		}
-		else if((rDir[1]>=rDir[0])&&(rDir[1]>=rDir[2])){
+		else if((fabs(rDir[1])>=fabs(rDir[0]))&&(fabs(rDir[1])>=fabs(rDir[2]))){
 			t = (hitPoint[1] - rOri[1]) / rDir[1];
 		}
-		else if((rDir[2]>=rDir[0])&&(rDir[2]>=rDir[1])){
+		else if((fabs(rDir[2])>=fabs(rDir[0]))&&(fabs(rDir[2])>=fabs(rDir[1]))){
 			t = (hitPoint[2] - rOri[2]) / rDir[2];
 		}
-		if(t>tmin && t<h.getT())
+
+		//world's normal
+		mInverse.Transpose();
+		Vec3f wNormal = hTrans.getNormal();
+		mInverse.TransformDirection(wNormal);
+		wNormal.Normalize();  //need normalize
+		//h.setNormal(wNormal);
+
+		if(t>=tmin && t<=h.getT())
 		{
 			h.set(t,hTrans.getMaterial(),wNormal,r);
 			return 1;

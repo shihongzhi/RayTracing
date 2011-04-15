@@ -14,9 +14,9 @@
 
 int main(int argc,char **argv)
 {
-	char *input_file = "assignment4/scene8_bunny_mesh_40k.txt";
-	int width = 300;
-	int height = 300;
+	char *input_file = "assignment6/scene6_14_glass_sphere.txt";
+	int width = 600;
+	int height = 600;
 	char *output_file = "test.tga";
 	float depth_min = 0;
 	float depth_max = 1;
@@ -27,7 +27,7 @@ int main(int argc,char **argv)
 
 	SceneParser parser(input_file);
 	Camera* camera = parser.getCamera();
-	RayTracer tracer(&parser,3);
+	RayTracer tracer(&parser,5);
 	Image image(width,height);
 	Ray r;
 

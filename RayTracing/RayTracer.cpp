@@ -23,8 +23,9 @@ Vec3f RayTracer::traceRay(Ray &ray, float tmin, int bounces, float indexOfRefrac
 	{
 		RayTracingStats::IncrementNumShadowRays();
 		Vec3f col(0,0,0);
+		Vec3f hitPoint = hit.getIntersectionPoint();
 		Vec3f tempAmb;
-		Vec3f::MultRow(tempAmb,s->getAmbientLight(),hit.getMaterial()->getDiffuse());  //Kd La
+		Vec3f::MultRow(tempAmb,s->getAmbientLight(),hit.getMaterial()->getDiffuse(hitPoint));  //Kd La
 		col += tempAmb;
 		int lightNumber = s->getNumLights();
 		Light *light;
@@ -33,48 +34,48 @@ Vec3f RayTracer::traceRay(Ray &ray, float tmin, int bounces, float indexOfRefrac
 			light = s->getLight(i);
 			Vec3f lightColor;
 			Vec3f dirToLight;
-			Vec3f interPoint = hit.getIntersectionPoint();
+			//Vec3f interPoint = hit.getIntersectionPoint();
 			float distanceToLight;
-			light->getIllumination(interPoint,dirToLight,lightColor,distanceToLight);
-			if(!castShadowRayGrid(interPoint-ray.getDirection()*EPSILON,dirToLight,distanceToLight,grid))
+			light->getIllumination(hitPoint,dirToLight,lightColor,distanceToLight);
+			if(!castShadowRayGrid(hitPoint-ray.getDirection()*EPSILON,dirToLight,distanceToLight,grid))
 			{
 				Vec3f tempShade = hit.getMaterial()->Shade(ray,hit,dirToLight,lightColor);  //diffuse specular
 				col += tempShade;
 			}
 		}
-		if(hit.getMaterial()->isReflect())  
+		if(hit.getMaterial()->isReflect(hitPoint))  
 		{
-			Ray rayReflect(mirrorDirection(hit.getNormal(),ray.getDirection()),hit.getIntersectionPoint());
+			Ray rayReflect(mirrorDirection(hit.getNormal(),ray.getDirection()),hitPoint);
 			Vec3f tempRefl;
 			Hit hit2(1000,NULL,Vec3f(1,1,1));
-			Vec3f::MultRow(tempRefl,hit.getMaterial()->getReflect(),traceRay(rayReflect,tmin,bounces+1,indexOfRefraction,hit2,grid)); //weight,indexOfRefrection
+			Vec3f::MultRow(tempRefl,hit.getMaterial()->getReflect(hitPoint),traceRay(rayReflect,tmin,bounces+1,indexOfRefraction,hit2,grid)); //weight,indexOfRefrection
 			col += tempRefl;
 		}
-		if(hit.getMaterial()->isTransparent())
+		if(hit.getMaterial()->isTransparent(hitPoint))
 		{
 			bool notTotalReflective;
 			Vec3f transmittedDir;
 			if(ray.getDirection().Dot3(hit.getNormal())>0) //ray is inside the object
 			{
-				notTotalReflective = transmittedDirection(hit.getNormal()*(-1.0f),ray.getDirection(),hit.getMaterial()->getIndexOfRefrac(),indexOfRefraction,transmittedDir);
+				notTotalReflective = transmittedDirection(hit.getNormal()*(-1.0f),ray.getDirection(),hit.getMaterial()->getIndexOfRefrac(hitPoint),indexOfRefraction,transmittedDir);
 			}
 			else  //outside
 			{
-				notTotalReflective = transmittedDirection(hit.getNormal(),ray.getDirection(),indexOfRefraction,hit.getMaterial()->getIndexOfRefrac(),transmittedDir);
+				notTotalReflective = transmittedDirection(hit.getNormal(),ray.getDirection(),indexOfRefraction,hit.getMaterial()->getIndexOfRefrac(hitPoint),transmittedDir);
 			}
 			
 			if(notTotalReflective)
 			{
-				Ray rayTransparent(transmittedDir,hit.getIntersectionPoint());
+				Ray rayTransparent(transmittedDir,hitPoint);
 				Vec3f tempTrans;
 				Hit hit3(10000,NULL,Vec3f(1,1,1));
-				Vec3f::MultRow(tempTrans,hit.getMaterial()->getTrans(),traceRay(rayTransparent,tmin,bounces+1,indexOfRefraction,hit3,grid));
+				Vec3f::MultRow(tempTrans,hit.getMaterial()->getTrans(hitPoint),traceRay(rayTransparent,tmin,bounces+1,indexOfRefraction,hit3,grid));
 				col += tempTrans;
 			}
 			else
 			{
 				Vec3f tempTotalTrans;
-				Vec3f::MultRow(tempTotalTrans,hit.getMaterial()->getTrans(),hit.getMaterial()->getDiffuse());
+				Vec3f::MultRow(tempTotalTrans,hit.getMaterial()->getTrans(hitPoint),hit.getMaterial()->getDiffuse(hitPoint));
 				col += tempTotalTrans;
 			}
 		}
@@ -133,5 +134,5 @@ bool RayTracer::castShadowRayGrid(Vec3f point, Vec3f lightDir, float distanceToL
 {
 	Ray r(lightDir,point);
 	Hit hit(distanceToLight,NULL,Vec3f(1,1,1));
-	return grid->shadowIntersect(r,hit,0);
+	return grid->shadowIntersect(r,hit,EPSILON);  //又是因为这里没加EPSILON，又出现了影子的乱点情况
 }

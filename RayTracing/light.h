@@ -72,7 +72,7 @@ public:
     attenuation_1 = a1;
     attenuation_2 = a2;
     attenuation_3 = a3;
-    printf ("LIGHT  %f %f %f\n", attenuation_1,attenuation_2,attenuation_3);
+    //printf ("LIGHT  %f %f %f\n", attenuation_1,attenuation_2,attenuation_3);
  }
   ~PointLight() {}
 

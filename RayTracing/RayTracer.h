@@ -3,6 +3,7 @@
 class Ray;
 class Vec3f;
 class Hit;
+class Grid;
 
 class RayTracer{
 public:
